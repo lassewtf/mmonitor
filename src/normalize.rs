@@ -5,6 +5,7 @@ pub(crate) fn normalize(kind: CheckKind, output: &ParsedOutput) -> Result<Vec<Me
         CheckKind::SystemDisk => disk(output),
         CheckKind::CpuLoad => cpu_load(output),
         CheckKind::Memory => memory(output),
+        CheckKind::MacosVersion => Err("macOS version is not Nagios output".to_owned()),
     }
 }
 

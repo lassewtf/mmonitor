@@ -55,6 +55,12 @@ kind = "memory"
 program = "$INSTALL_DIR/check_mmonitor_memory"
 args = []
 timeout_ms = 3000
+
+[checks.macos_version]
+kind = "macos_version"
+program = "/usr/bin/sw_vers"
+args = []
+timeout_ms = 1000
 EOF
   sudo install -m 0644 "$config" "$CONFIG_PATH"
 else

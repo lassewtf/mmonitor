@@ -34,7 +34,7 @@ The installer installs `monitoring-plugins` when needed, copies both binaries to
 ```bash
 /opt/ma/mmonitor/mmonitor \
   --config /opt/ma/mmonitor/checks.toml \
-  check system_disk cpu_load memory
+  check system_disk cpu_load memory macos_version
 ```
 
 The command writes structured JSON to standard output. Check exit codes are preserved but not interpreted as health assessments.

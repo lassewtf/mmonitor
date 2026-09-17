@@ -8,13 +8,14 @@ Das Projekt wird in Rust umgesetzt und unterstützt zunächst ausschließlich ma
 
 ## Erster Umfang
 
-Der erste Schnitt liest das Systemdateisystem `/`, die CPU-Systemlast und den Arbeitsspeicher aus.
+Der erste Schnitt liest das Systemdateisystem `/`, die CPU-Systemlast, den Arbeitsspeicher und die installierte macOS-Version aus.
 
 | Check-ID | Programm | Messwerte |
 |---|---|---|
 | `system_disk` | `check_disk` aus Homebrews `monitoring-plugins` | Gesamtgröße, belegter und verfügbarer Speicher in Bytes |
 | `cpu_load` | `check_load` aus Homebrews `monitoring-plugins` | logische CPUs sowie Load Average und Load Average pro logischer CPU über 1, 5 und 15 Minuten |
 | `memory` | mit `mmonitor` ausgeliefertes `check_mmonitor_memory` | gesamter, benutzter, verfügbarer, freier, wired und komprimierter Arbeitsspeicher sowie Swap in Bytes |
+| `macos_version` | Apples `/usr/bin/sw_vers` | Produktname, Version und Build als Strings |
 
 Netzwerk, Prozesse, weitere Dateisysteme und CPU-Auslastung in Prozent sind nicht enthalten.
 
@@ -71,6 +72,12 @@ kind = "memory"
 program = "/opt/ma/mmonitor/check_mmonitor_memory"
 args = []
 timeout_ms = 3000
+
+[checks.macos_version]
+kind = "macos_version"
+program = "/usr/bin/sw_vers"
+args = []
+timeout_ms = 1000
 ```
 
 `check_load -r` liefert rohe und durch die erkannte Anzahl logischer CPUs geteilte Load-Average-Werte. Die CPU-Anzahl steht in seiner Zusammenfassung, nicht als eigener Performance-Datenwert.
@@ -93,14 +100,12 @@ ProcessRunner
  ▼
 RawCheckResult
  │
- ▼
-NagiosParser
+ ├── NagiosParser ──► Normalizer
  │
- ▼
-Normalizer
- │
- ▼
-CheckResult
+ └── SwVersParser
+          │
+          ▼
+     CheckResult
 ```
 
 ### Bibliotheks-Schnittstelle
@@ -109,7 +114,7 @@ CheckResult
 
 ```rust
 let monitor = Monitor::from_path("checks.toml")?;
-let results = monitor.run(["system_disk", "cpu_load", "memory"])?;
+let results = monitor.run(["system_disk", "cpu_load", "memory", "macos_version"])?;
 ```
 
 Die Bibliothek erhält eine geordnete Liste angefragter Check-IDs. Eine ID führt genau ein externes Programm aus. Eine einzelne Anfrage ist eine Liste mit genau einer ID.
@@ -154,9 +159,19 @@ Er übernimmt:
 
 Warn- und Critical-Felder werden nicht als Bewertung übernommen.
 
+### macOS-Versions-Parsing
+
+`sw_vers.rs` liest `ProductName`, `ProductVersion` und `BuildVersion` aus der Ausgabe von `/usr/bin/sw_vers`. Fehlende, leere oder doppelte Pflichtfelder führen zu `invalid_output`.
+
+Versionsdaten bleiben unveränderte String-Fakten:
+
+- `os.name`,
+- `os.version`,
+- `os.build`.
+
 ### Normalisierung
 
-`normalize.rs` überführt bekannte Check-Ausgaben in stabile Metriknamen. Ein einfacher `match` genügt:
+`normalize.rs` überführt bekannte Nagios-Ausgaben in stabile Metriknamen. Ein einfacher `match` genügt:
 
 ```rust
 match kind {
@@ -174,7 +189,7 @@ Die CLI ist eine dünne Schicht über der Bibliothek.
 
 ```bash
 mmonitor --config checks.toml check system_disk
-mmonitor --config checks.toml check system_disk cpu_load memory
+mmonitor --config checks.toml check system_disk cpu_load memory macos_version
 ```
 
 Die Standardausgabe ist JSON. Diagnostische Meldungen gehen nach `stderr`.
@@ -253,6 +268,7 @@ struct CheckResult {
     execution: Execution,
     exit_code: Option<i32>,
     metrics: Vec<Metric>,
+    facts: Vec<Fact>,
     stdout: String,
     stderr: String,
     duration_ms: u64,
@@ -289,7 +305,8 @@ mmonitor/
 │   ├── model.rs
 │   ├── nagios.rs
 │   ├── normalize.rs
-│   └── runner.rs
+│   ├── runner.rs
+│   └── sw_vers.rs
 └── tests/
     └── cli.rs
 ```
@@ -305,6 +322,8 @@ Die automatisierte Prüfung verwendet ein kleines Testprogramm mit fester Nagios
 - Parsing von Gesamtgröße, belegtem und verfügbarem Dateisystemspeicher,
 - Parsing von CPU-Anzahl, rohem und normiertem Load Average,
 - Berechnung und Parsing aller festgelegten Memory- und Swap-Werte,
+- Parsing von macOS-Produktname, Version und Build,
+- Zurückweisung fehlender oder doppelter `sw_vers`-Pflichtfelder,
 - Laufzeitabhängige Page Size ohne fest codierte 4- oder 16-KiB-Annahme,
 - Timeout und fehlendes Programm,
 - unveränderte Übernahme von Exit-Code, `stdout` und `stderr`,

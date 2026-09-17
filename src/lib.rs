@@ -2,13 +2,14 @@ mod config;
 mod nagios;
 mod normalize;
 mod runner;
+mod sw_vers;
 
 pub mod model;
 
 use std::{error::Error, fmt, path::Path};
 
 pub use config::CheckKind;
-pub use model::{CheckResult, Execution, Metric};
+pub use model::{CheckResult, Execution, Fact, Metric};
 
 pub struct Monitor {
     config: config::Config,
@@ -54,19 +55,25 @@ impl Monitor {
     fn run_one(&self, id: &str) -> CheckResult {
         let check = &self.config.checks[id];
         let mut raw = runner::run(check);
-        let metrics = if raw.execution == Execution::Completed {
-            match nagios::parse(&raw.stdout)
-                .and_then(|output| normalize::normalize(check.kind, &output))
-            {
-                Ok(metrics) => metrics,
+        let (metrics, facts) = if raw.execution == Execution::Completed {
+            let parsed = match check.kind {
+                CheckKind::MacosVersion => {
+                    sw_vers::parse(&raw.stdout).map(|facts| (Vec::new(), facts))
+                }
+                _ => nagios::parse(&raw.stdout)
+                    .and_then(|output| normalize::normalize(check.kind, &output))
+                    .map(|metrics| (metrics, Vec::new())),
+            };
+            match parsed {
+                Ok(values) => values,
                 Err(error) => {
                     raw.execution = Execution::InvalidOutput;
                     raw.error = Some(error);
-                    Vec::new()
+                    (Vec::new(), Vec::new())
                 }
             }
         } else {
-            Vec::new()
+            (Vec::new(), Vec::new())
         };
 
         CheckResult {
@@ -74,6 +81,7 @@ impl Monitor {
             execution: raw.execution,
             exit_code: raw.exit_code,
             metrics,
+            facts,
             stdout: raw.stdout,
             stderr: raw.stderr,
             duration_ms: raw.duration_ms,

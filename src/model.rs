@@ -16,12 +16,19 @@ pub struct Metric {
     pub unit: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Fact {
+    pub name: String,
+    pub value: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct CheckResult {
     pub id: String,
     pub execution: Execution,
     pub exit_code: Option<i32>,
     pub metrics: Vec<Metric>,
+    pub facts: Vec<Fact>,
     pub stdout: String,
     pub stderr: String,
     pub duration_ms: u64,

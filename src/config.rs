@@ -22,6 +22,7 @@ pub enum CheckKind {
     SystemDisk,
     CpuLoad,
     Memory,
+    MacosVersion,
 }
 
 pub(crate) fn load(path: impl AsRef<Path>) -> Result<Config, Box<dyn Error + Send + Sync>> {
@@ -60,7 +61,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parses_the_three_check_kinds() {
+    fn parses_the_four_check_kinds() {
         let config: Config = toml::from_str(
             r#"
             [checks.disk]
@@ -78,11 +79,16 @@ mod tests {
             kind = "memory"
             program = "/check_memory"
             timeout_ms = 3000
+
+            [checks.macos_version]
+            kind = "macos_version"
+            program = "/usr/bin/sw_vers"
+            timeout_ms = 1000
             "#,
         )
         .unwrap();
 
-        assert_eq!(config.checks.len(), 3);
+        assert_eq!(config.checks.len(), 4);
         assert!(config.checks["disk"].args.is_empty());
         assert_eq!(config.checks["cpu"].args, ["-r"]);
     }
