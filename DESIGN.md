@@ -105,7 +105,7 @@ CheckResult
 
 ```rust
 let monitor = Monitor::from_path("checks.toml")?;
-let results = monitor.run(["system_disk", "cpu_load", "memory"]);
+let results = monitor.run(["system_disk", "cpu_load", "memory"])?;
 ```
 
 Die Bibliothek erhält eine geordnete Liste angefragter Check-IDs. Eine ID führt genau ein externes Programm aus. Eine einzelne Anfrage ist eine Liste mit genau einer ID.
@@ -273,6 +273,7 @@ mmonitor/
 ├── Cargo.lock
 ├── DESIGN.md
 ├── README.md
+├── checks.toml.example
 ├── src/
 │   ├── bin/
 │   │   └── check_mmonitor_memory.rs

@@ -1,0 +1,17 @@
+[checks.system_disk]
+kind = "system_disk"
+program = "/opt/homebrew/sbin/check_disk"
+args = ["-w", "0%", "-c", "0%", "-p", "/"]
+timeout_ms = 3000
+
+[checks.cpu_load]
+kind = "cpu_load"
+program = "/opt/homebrew/sbin/check_load"
+args = ["-r"]
+timeout_ms = 3000
+
+[checks.memory]
+kind = "memory"
+program = "/opt/homebrew/bin/check_mmonitor_memory"
+args = []
+timeout_ms = 3000
