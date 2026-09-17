@@ -43,7 +43,9 @@ Auf Apple Silicon liegen die Programme standardmäßig unter:
 
 Der Memory-Check wird als eigene ausführbare Datei `check_mmonitor_memory` zusammen mit `mmonitor` unter `/opt/ma/mmonitor` installiert. Er bleibt ein unabhängig aufrufbares externes Check-Programm.
 
-`install.sh` installiert bei Bedarf `monitoring-plugins`, baut beide Rust-Binärdateien und legt eine fehlende Konfiguration unter `/opt/ma/mmonitor/checks.toml` an. Eine vorhandene Konfiguration bleibt unverändert.
+`deploy.sh` baut beide Rust-Binärdateien und erzeugt das Git-ignorierte Verzeichnis `deploy/`. Dieses enthält beide Binärdateien, `checks.toml.example` und `install.sh`.
+
+`deploy/install.sh` benötigt weder Rust noch den Quellcode. Es installiert bei Bedarf `monitoring-plugins`, kopiert beide Binärdateien nach `/opt/ma/mmonitor` und legt eine fehlende Konfiguration unter `/opt/ma/mmonitor/checks.toml` an. Eine vorhandene Konfiguration bleibt unverändert.
 
 `mmonitor` lädt keine Programme herunter und installiert keine Laufzeitabhängigkeiten.
 
@@ -276,6 +278,7 @@ mmonitor/
 ├── DESIGN.md
 ├── README.md
 ├── checks.toml.example
+├── deploy.sh
 ├── install.sh
 ├── src/
 │   ├── bin/

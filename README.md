@@ -2,13 +2,32 @@
 
 A macOS Apple Silicon monitor interface built around independent check programs.
 
-## Build
+## Build deployment package
 
 ```bash
+./deploy.sh
+```
+
+The script builds both release binaries and creates the ignored `deploy/` directory containing:
+
+```text
+deploy/
+├── mmonitor
+├── check_mmonitor_memory
+├── checks.toml.example
+└── install.sh
+```
+
+## Install
+
+Transfer the `deploy/` directory to the target Mac, then run:
+
+```bash
+cd deploy
 ./install.sh
 ```
 
-The installer builds both binaries, installs `monitoring-plugins` when needed, and installs everything under `/opt/ma/mmonitor`. An existing configuration is preserved.
+The installer installs `monitoring-plugins` when needed, copies both binaries to `/opt/ma/mmonitor`, and creates `/opt/ma/mmonitor/checks.toml`. An existing configuration is preserved. Rust and the source repository are not required on the target Mac.
 
 ## Run
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+readonly SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly INSTALL_DIR="/opt/ma/mmonitor"
 readonly CONFIG_PATH="$INSTALL_DIR/checks.toml"
 
@@ -10,9 +10,15 @@ if [[ "$(uname -s)" != "Darwin" || "$(uname -m)" != "arm64" ]]; then
   exit 1
 fi
 
-for command in brew cargo; do
-  if ! command -v "$command" >/dev/null 2>&1; then
-    echo "required command not found: $command" >&2
+if ! command -v brew >/dev/null 2>&1; then
+  echo "required command not found: brew" >&2
+  exit 1
+fi
+
+for binary in mmonitor check_mmonitor_memory; do
+  if [[ ! -x "$SOURCE_DIR/$binary" ]]; then
+    echo "deployment binary not found: $SOURCE_DIR/$binary" >&2
+    echo "run deploy.sh before install.sh" >&2
     exit 1
   fi
 done
@@ -21,13 +27,10 @@ if ! brew list --formula monitoring-plugins >/dev/null 2>&1; then
   brew install monitoring-plugins
 fi
 
-cd "$ROOT_DIR"
-cargo build --release --locked
-
 sudo install -d -m 0755 "$INSTALL_DIR"
 sudo install -m 0755 \
-  target/release/mmonitor \
-  target/release/check_mmonitor_memory \
+  "$SOURCE_DIR/mmonitor" \
+  "$SOURCE_DIR/check_mmonitor_memory" \
   "$INSTALL_DIR/"
 
 if [[ ! -e "$CONFIG_PATH" ]]; then
