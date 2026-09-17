@@ -24,6 +24,7 @@ install -m 0755 target/release/mmonitor "$staging/mmonitor"
 install -m 0755 target/release/check_mmonitor_memory "$staging/check_mmonitor_memory"
 install -m 0755 install.sh "$staging/install.sh"
 install -m 0644 checks.toml.example "$staging/checks.toml.example"
+install -m 0644 com.ma.mmonitor.collector.plist "$staging/com.ma.mmonitor.collector.plist"
 
 rm -rf "$DEPLOY_DIR"
 mv "$staging" "$DEPLOY_DIR"

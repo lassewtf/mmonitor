@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.ma.mmonitor.collector</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/ma/mmonitor/mmonitor</string>
+    <string>--config</string>
+    <string>/opt/ma/mmonitor/checks.toml</string>
+    <string>collect</string>
+  </array>
+  <key>UserName</key>
+  <string>_mmonitor</string>
+  <key>GroupName</key>
+  <string>_mmonitor</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StartInterval</key>
+  <integer>60</integer>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>Umask</key>
+  <integer>23</integer>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>LC_ALL</key>
+    <string>C</string>
+    <key>PATH</key>
+    <string>/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/opt/homebrew/sbin</string>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>/dev/null</string>
+  <key>StandardErrorPath</key>
+  <string>/opt/ma/mmonitor/log/collector.stderr.log</string>
+</dict>
+</plist>

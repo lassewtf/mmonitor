@@ -157,6 +157,8 @@ mod tests {
             program: program.to_owned(),
             args: args.iter().map(|arg| (*arg).to_owned()).collect(),
             timeout_ms,
+            interval_seconds: None,
+            store: None,
         }
     }
 

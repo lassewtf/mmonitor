@@ -2,11 +2,17 @@ mod config;
 mod nagios;
 mod normalize;
 mod runner;
+mod storage;
 mod sw_vers;
 
 pub mod model;
 
-use std::{error::Error, fmt, path::Path};
+use std::{
+    error::Error,
+    fmt,
+    path::Path,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 pub use config::CheckKind;
 pub use model::{CheckResult, Execution, Fact, Metric};
@@ -28,6 +34,28 @@ impl Monitor {
 
     pub fn check_kind(&self, id: &str) -> Option<CheckKind> {
         self.config.checks.get(id).map(|check| check.kind)
+    }
+
+    pub fn collect(&self) -> Result<Vec<CheckResult>, Box<dyn Error + Send + Sync>> {
+        let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as i64;
+        self.collect_at(now)
+    }
+
+    fn collect_at(&self, now_ms: i64) -> Result<Vec<CheckResult>, Box<dyn Error + Send + Sync>> {
+        let mut connection = storage::open(&self.config.storage.path)?;
+        let transaction = storage::begin_collection(&mut connection)?;
+        let mut results = Vec::new();
+
+        for (id, check) in &self.config.checks {
+            if storage::is_due(&transaction, id, now_ms, check.interval_seconds())? {
+                let result = self.run_one(id);
+                storage::record(&transaction, &result, check.store(), now_ms)?;
+                results.push(result);
+            }
+        }
+        storage::compact_if_due(&transaction, now_ms)?;
+        transaction.commit()?;
+        Ok(results)
     }
 
     pub fn run<I, S>(&self, ids: I) -> Result<Vec<CheckResult>, MonitorError>

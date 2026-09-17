@@ -55,29 +55,40 @@ Check-Programme werden direkt und ohne Shell gestartet. Programm und Argumente b
 Beispieldefinition:
 
 ```toml
+[storage]
+path = "/opt/ma/mmonitor/data/mmonitor.sqlite3"
+
 [checks.system_disk]
 kind = "system_disk"
 program = "/opt/homebrew/sbin/check_disk"
 args = ["-w", "0%", "-c", "0%", "-p", "/"]
 timeout_ms = 3000
+interval_seconds = 300
+store = "always"
 
 [checks.cpu_load]
 kind = "cpu_load"
 program = "/opt/homebrew/sbin/check_load"
 args = ["-r"]
 timeout_ms = 3000
+interval_seconds = 60
+store = "always"
 
 [checks.memory]
 kind = "memory"
 program = "/opt/ma/mmonitor/check_mmonitor_memory"
 args = []
 timeout_ms = 3000
+interval_seconds = 60
+store = "always"
 
 [checks.macos_version]
 kind = "macos_version"
 program = "/usr/bin/sw_vers"
 args = []
 timeout_ms = 1000
+interval_seconds = 3600
+store = "on_change"
 ```
 
 `check_load -r` liefert rohe und durch die erkannte Anzahl logischer CPUs geteilte Load-Average-Werte. Die CPU-Anzahl steht in seiner Zusammenfassung, nicht als eigener Performance-Datenwert.
@@ -190,6 +201,7 @@ Die CLI ist eine dünne Schicht über der Bibliothek.
 ```bash
 mmonitor --config checks.toml check system_disk
 mmonitor --config checks.toml check system_disk cpu_load memory macos_version
+mmonitor --config checks.toml collect
 ```
 
 Die Standardausgabe ist JSON. Diagnostische Meldungen gehen nach `stderr`.
@@ -260,6 +272,165 @@ Der Check liefert mindestens:
 
 Speicherwerte verwenden Bytes. `memory.system_free_percent` verwendet Prozent. Der Check gibt keine fachliche Bewertung aus.
 
+## Periodische Sammlung und Historie
+
+Der manuelle Befehl `check` wird durch `collect` ergänzt:
+
+```text
+check   führt die angeforderten Checks sofort aus und speichert nichts
+collect führt nur fällige Checks aus und speichert deren Ergebnisse
+```
+
+Ein systemweiter LaunchDaemon startet `collect` jede Minute. `interval_seconds` bestimmt pro Check, ob eine Ausführung fällig ist.
+
+### Speicherstrategie
+
+Jeder Check besitzt eine Strategie `store`:
+
+- `always` speichert jede Ausführung.
+- `on_change` speichert nur semantische Änderungen.
+
+Ohne explizite Angabe verwenden numerische Checks `always` und `macos_version` verwendet `on_change`. Die Standardintervalle entsprechen der Beispielkonfiguration.
+
+Für `on_change` umfasst der Vergleich:
+
+- normalisierte Metriknamen, Werte und Einheiten,
+- normalisierte Faktennamen und Werte,
+- technischen Ausführungszustand,
+- technischen Fehler.
+
+Laufzeit, Zeitstempel, rohe Ausgabe und Nagios-Bewertung beeinflussen den Vergleich nicht. Bei einer Änderung wird der vollständige Check-Snapshot gespeichert.
+
+Der erste erfolgreiche Snapshot wird immer gespeichert. Technische Zustandswechsel und die Erholung nach einem Fehler werden ebenfalls gespeichert. Wiederholte identische Ergebnisse erzeugen keinen weiteren Historieneintrag.
+
+### Aktueller Check-Zustand
+
+`check_state` wird unabhängig von `store` bei jeder Ausführung aktualisiert:
+
+```text
+check_state
+- check_id
+- last_attempt_at
+- last_success_at
+- last_execution
+- last_error
+- last_snapshot
+```
+
+Damit bleibt sichtbar, wann ein unveränderter Check zuletzt tatsächlich ausgeführt wurde.
+
+### SQLite
+
+Die Datenbank liegt unter:
+
+```text
+/opt/ma/mmonitor/data/mmonitor.sqlite3
+```
+
+SQLite darf daneben seine WAL- und SHM-Dateien anlegen. WAL bedeutet Write-Ahead Log und ermöglicht robuste Transaktionen bei parallelen Lesezugriffen.
+
+Die Historie verwendet mindestens:
+
+```text
+runs
+- id
+- check_id
+- observed_at
+- execution
+- exit_code
+- duration_ms
+- error
+
+samples
+- run_id
+- metric_name
+- value
+- unit
+
+facts
+- run_id
+- fact_name
+- value
+
+rollups
+- check_id
+- metric_name
+- unit
+- resolution
+- bucket_start
+- minimum
+- maximum
+- sum
+- count
+- first
+- last
+```
+
+Eine SQLite-basierte Collection-Sperre verhindert gleichzeitig laufende `collect`-Aufrufe.
+
+### Verdichtung und Aufbewahrung
+
+Messwerte werden aggregiert statt zufällig gelöscht:
+
+```text
+Rohdaten im Minutenraster  7 Tage
+5-Minuten-Rollups          30 Tage
+1-Stunden-Rollups          unbegrenzt
+```
+
+Rollups speichern Minimum, Maximum, Summe, Anzahl, ersten und letzten Wert. Fehlende Werte werden nicht interpoliert.
+
+Die Verdichtung verarbeitet nur abgeschlossene Zeitfenster. Upsert, Rollup und Löschung laufen in einer Transaktion. Quelldaten werden erst nach erfolgreicher Speicherung des Ziel-Rollups gelöscht.
+
+Fakten wie die macOS-Version werden nicht zeitlich aggregiert. `on_change` hält deren Änderungshistorie bereits klein.
+
+## Systemweiter LaunchDaemon
+
+Die periodische Sammlung verwendet einen LaunchDaemon, keinen LaunchAgent. Ein LaunchDaemon läuft auch ohne angemeldeten Benutzer.
+
+Kennung und Datei:
+
+```text
+com.ma.mmonitor.collector
+/Library/LaunchDaemons/com.ma.mmonitor.collector.plist
+```
+
+Der LaunchDaemon startet:
+
+```text
+/opt/ma/mmonitor/mmonitor --config /opt/ma/mmonitor/checks.toml collect
+```
+
+Er verwendet `RunAtLoad` und `StartInterval = 60`. Er läuft als dedizierter lokaler Dienstbenutzer und als gleichnamige Gruppe:
+
+```text
+UserName  = _mmonitor
+GroupName = _mmonitor
+```
+
+`_mmonitor` besitzt:
+
+- keine interaktive Anmeldung,
+- kein Passwort,
+- keine Admin- oder sudo-Rechte,
+- `/var/empty` als Home-Verzeichnis,
+- `/usr/bin/false` als Shell.
+
+Der Installer legt Benutzer und Gruppe idempotent an. Vorhandene passende Identitäten werden weiterverwendet. Bei kollidierenden oder unerwarteten Eigenschaften bricht die Installation ab.
+
+Dateirechte:
+
+```text
+/opt/ma/mmonitor/                     root:wheel             0755
+/opt/ma/mmonitor/mmonitor            root:wheel             0755
+/opt/ma/mmonitor/check_*             root:wheel             0755
+/opt/ma/mmonitor/checks.toml         root:_mmonitor         0640
+/opt/ma/mmonitor/data/               _mmonitor:_mmonitor    0750
+/opt/ma/mmonitor/log/                _mmonitor:_mmonitor    0750
+```
+
+Die Datenbank und Logdateien werden niemals bei Installation oder Aktualisierung überschrieben oder gelöscht. Binärdateien und Konfiguration bleiben `root`-verwaltet.
+
 Das interne Ergebnismodell entspricht dieser Form:
 
 ```rust
@@ -294,6 +465,7 @@ mmonitor/
 ├── DESIGN.md
 ├── README.md
 ├── checks.toml.example
+├── com.ma.mmonitor.collector.plist
 ├── deploy.sh
 ├── install.sh
 ├── src/
@@ -306,6 +478,7 @@ mmonitor/
 │   ├── nagios.rs
 │   ├── normalize.rs
 │   ├── runner.rs
+│   ├── storage.rs
 │   └── sw_vers.rs
 └── tests/
     └── cli.rs
@@ -327,7 +500,11 @@ Die automatisierte Prüfung verwendet ein kleines Testprogramm mit fester Nagios
 - Laufzeitabhängige Page Size ohne fest codierte 4- oder 16-KiB-Annahme,
 - Timeout und fehlendes Programm,
 - unveränderte Übernahme von Exit-Code, `stdout` und `stderr`,
-- Abwesenheit einer fachlichen Bewertung.
+- Abwesenheit einer fachlichen Bewertung,
+- Speicherung vollständiger Check-Snapshots,
+- `on_change` ohne unveränderte Historienkopien,
+- Sperre gegen parallele Collector-Läufe,
+- idempotente 5-Minuten- und Stunden-Rollups.
 
 Optionale lokale Integrationstests dürfen `/opt/homebrew/sbin/check_disk` und `/opt/homebrew/sbin/check_load` verwenden. Die reguläre Testsuite darf Homebrew nicht voraussetzen.
 
