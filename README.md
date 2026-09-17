@@ -5,17 +5,16 @@ A macOS Apple Silicon monitor interface built around independent check programs.
 ## Build
 
 ```bash
-brew install monitoring-plugins
-cargo build --release
+./install.sh
 ```
 
-Copy `checks.toml.example` and point `checks.memory.program` to the built or installed `check_mmonitor_memory` binary.
+The installer builds both binaries, installs `monitoring-plugins` when needed, and installs everything under `/opt/ma/mmonitor`. An existing configuration is preserved.
 
 ## Run
 
 ```bash
-./target/release/mmonitor \
-  --config checks.toml \
+/opt/ma/mmonitor/mmonitor \
+  --config /opt/ma/mmonitor/checks.toml \
   check system_disk cpu_load memory
 ```
 

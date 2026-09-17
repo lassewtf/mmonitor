@@ -12,6 +12,6 @@ timeout_ms = 3000
 
 [checks.memory]
 kind = "memory"
-program = "/opt/homebrew/bin/check_mmonitor_memory"
+program = "/opt/ma/mmonitor/check_mmonitor_memory"
 args = []
 timeout_ms = 3000

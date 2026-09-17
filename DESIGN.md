@@ -41,7 +41,9 @@ Auf Apple Silicon liegen die Programme standardmäßig unter:
 /opt/homebrew/sbin/check_load
 ```
 
-Der Memory-Check wird als eigene ausführbare Datei `check_mmonitor_memory` zusammen mit `mmonitor` installiert. Er bleibt ein unabhängig aufrufbares externes Check-Programm.
+Der Memory-Check wird als eigene ausführbare Datei `check_mmonitor_memory` zusammen mit `mmonitor` unter `/opt/ma/mmonitor` installiert. Er bleibt ein unabhängig aufrufbares externes Check-Programm.
+
+`install.sh` installiert bei Bedarf `monitoring-plugins`, baut beide Rust-Binärdateien und legt eine fehlende Konfiguration unter `/opt/ma/mmonitor/checks.toml` an. Eine vorhandene Konfiguration bleibt unverändert.
 
 `mmonitor` lädt keine Programme herunter und installiert keine Laufzeitabhängigkeiten.
 
@@ -64,7 +66,7 @@ timeout_ms = 3000
 
 [checks.memory]
 kind = "memory"
-program = "/opt/homebrew/bin/check_mmonitor_memory"
+program = "/opt/ma/mmonitor/check_mmonitor_memory"
 args = []
 timeout_ms = 3000
 ```
@@ -274,6 +276,7 @@ mmonitor/
 ├── DESIGN.md
 ├── README.md
 ├── checks.toml.example
+├── install.sh
 ├── src/
 │   ├── bin/
 │   │   └── check_mmonitor_memory.rs
