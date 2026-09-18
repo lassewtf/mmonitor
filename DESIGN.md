@@ -429,7 +429,7 @@ Dateirechte:
 /opt/ma/mmonitor/log/                _mmonitor:_mmonitor    0750
 ```
 
-Die Datenbank und Logdateien werden niemals bei Installation oder Aktualisierung überschrieben oder gelöscht. Binärdateien und Konfiguration bleiben `root`-verwaltet.
+Die Datenbank und Logdateien werden bei Installation oder Aktualisierung weder überschrieben, gelöscht noch als `root` in ihren Metadaten verändert. Der Installer akzeptiert dort nur reguläre Dateien mit `_mmonitor:_mmonitor 0640` und bricht bei Symlinks, anderen Dateitypen oder abweichenden Eigentümern und Rechten ab. Neue Dateien erstellt `_mmonitor` mit Umask `027`. Binärdateien und Konfiguration bleiben `root`-verwaltet.
 
 Das interne Ergebnismodell entspricht dieser Form:
 

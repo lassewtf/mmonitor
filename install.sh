@@ -119,17 +119,13 @@ fi
 
 sudo install -d -o root -g wheel -m 0755 "$INSTALL_DIR"
 sudo install -d -o "$SERVICE_USER" -g "$SERVICE_GROUP" -m 0750 "$DATA_DIR" "$LOG_DIR"
-for mutable_file in \
-  "$DATA_DIR/mmonitor.sqlite3" \
-  "$DATA_DIR/mmonitor.sqlite3-wal" \
-  "$DATA_DIR/mmonitor.sqlite3-shm" \
-  "$LOG_DIR/collector.stdout.log" \
-  "$LOG_DIR/collector.stderr.log"; do
-  if sudo test -e "$mutable_file"; then
-    sudo chown "$SERVICE_USER:$SERVICE_GROUP" "$mutable_file"
-    sudo chmod 0640 "$mutable_file"
+while IFS= read -r -d '' mutable_file; do
+  metadata="$(sudo stat -f '%HT|%Su|%Sg|%Lp' "$mutable_file")"
+  if [[ "$metadata" != "Regular File|$SERVICE_USER|$SERVICE_GROUP|640" ]]; then
+    echo "unexpected mutable file: $mutable_file ($metadata)" >&2
+    exit 1
   fi
-done
+done < <(sudo find -P "$DATA_DIR" "$LOG_DIR" -mindepth 1 -maxdepth 1 -print0)
 sudo install -o root -g wheel -m 0755 \
   "$SOURCE_DIR/mmonitor" \
   "$SOURCE_DIR/check_mmonitor_memory" \
